@@ -45,6 +45,9 @@ float* ReadXtr(int* OutNumLong, int* OutNumLat,
         
         // find min and max elevations
         
+        *OutHeightMax = -999999999.;
+        *OutHeightMin = 999999999.;
+        
         for(int lng = 0; lng < numLong; lng++) {
             
             if(elevations[offset + lng] < *OutHeightMin) {

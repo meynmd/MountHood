@@ -78,9 +78,9 @@ const int LANDSCAPE_RES = 1;
 
 const int TEX_TILE_FAC = 4;
 
-const float ELEV_BASE = -100.;
+const float ELEV_BASE = -1000.;
 const float LANDSCAPE_XZSCALE = 15.;
-const float LANDSCAPE_YSCALE = 0.4;
+const float LANDSCAPE_YSCALE = 0.3;
 
 
 

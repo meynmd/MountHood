@@ -684,7 +684,12 @@ LoadLandscape( ) {
                 0., 0., 0.
             };
             
+            // center the point in xz,
+            // shift y coordinate so lowest point is at y = 0
             
+            LandscapeGrid[lat][lng].x -= (float)NumElevLat / 2.;
+            LandscapeGrid[lat][lng].z -= (float)NumElevLong / 2.;
+            LandscapeGrid[lat][lng].y -= (LandscapeHeightMin - ELEV_BASE);
         }
     }
 }
@@ -721,13 +726,6 @@ ConstructLandscape( ) {
                         LandscapeGrid[lat][lon].z + (float)i / (float)LANDSCAPE_RES,
                         1., 1., 1.
                     };
-                    
-                    // shift the point to be centered about the origin,
-                    // shift y coordinate so lowest point is at y = 0
-                    
-                    LandscapePoints[xIdx][zIdx].x -= (float)NumElevLat / 2.;
-                    LandscapePoints[xIdx][zIdx].z -= (float)NumElevLong / 2.;
-                    LandscapePoints[xIdx][zIdx].y -= LandscapeHeightMin;
                     
                     // scale the point in xz
                     
