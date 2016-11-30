@@ -360,9 +360,11 @@ DrawTree(point p) {
         
         glPushMatrix();
         
-            glScalef(0.025, 0.025, 0.025);
-            
-            glTranslatef(p.x, p.y - ELEV_BASE + 1500, p.z);
+    
+            glTranslatef(p.x, p.y, p.z);
+    
+            glScalef(0.0125, 0.0125, 0.0125);
+    
             SetMaterial( 0.3, 0.7, 0.2, 0. );
             glShadeModel(GL_SMOOTH);
             glEnable(GL_TEXTURE_2D);
@@ -681,6 +683,8 @@ LoadLandscape( ) {
                 (float)lng,
                 0., 0., 0.
             };
+            
+            
         }
     }
 }
@@ -748,10 +752,6 @@ MakeLandscapeList( ) {
     
     glPushMatrix();
     
-    //glScalef(LANDSCAPE_XZSCALE, 1., LANDSCAPE_XZSCALE);
-        
-    //glTranslatef(0., ELEV_BASE, 0.);
-    
         //LandscapePoints[lat][lon]
         //                 x    z
         
@@ -761,8 +761,9 @@ MakeLandscapeList( ) {
                 
                 glBegin(GL_TRIANGLE_STRIP);
                 
-                int texIncLong = NumElevLong * LANDSCAPE_RES / TEX_TILES_LONG;
-                int texIncLat = NumElevLong * LANDSCAPE_RES / TEX_TILES_LAT;
+                int longestDim = (NumElevLong > NumElevLat) ? NumElevLong : NumElevLat;
+                int texIncLong = longestDim / TEX_TILE_FAC;
+                int texIncLat = texIncLong;
                 
                 glTexCoord2f(
                              (float)( x % texIncLat ) / texIncLat,
