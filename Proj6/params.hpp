@@ -49,7 +49,7 @@ const GLfloat AXES_WIDTH   = { 3. };
 
 // file paths
 
-const char PATH_XTR[] = "meyn0512.xtr";
+const char PATH_XTR[] = "meyn1024.xtr";
 
 const char MODELPATH_HELI[] = "heliBody_mesh.obj";
 const char MODELPATH_BLADES[] = "heliBlades_mesh.obj";
@@ -63,14 +63,16 @@ char TEXPATH_TREE[] = "pine_d.bmp";
 
 // animation params
 
-int     MS_PER_CYCLE = 50000;
+int     MS_PER_CYCLE = 60000;
 
-float   HeliInitAlt = 200.f;
-int     HeliAnimRevs = 5;
-float   HeliAnimRadius = 10.f;
+float   HeliInitAlt = 300.f;
+int     HeliAnimRevs = 2;
+float   HeliAnimRadius = 2500.f;
 
-float   CAM_RADIUS = 2.f;
-
+float   CAM_FOLLOW_DIST = 15.f;
+float   DEFAULT_FOLLOW_SCALE = 1.;
+float   HELI_LAG_FRAMES = 20.;
+float   HELI_ALT_INC = 4.;
 
 // landscape parameters
 
@@ -80,19 +82,20 @@ const int TEX_TILE_FAC = 4;
 
 const float ELEV_BASE = -1000.;
 const float LANDSCAPE_XZSCALE = 15.;
-const float LANDSCAPE_YSCALE = 0.3;
+const float LANDSCAPE_YSCALE = 0.4;
+
+const float TREE_SCALE = 0.25;
 
 
 
 // landscape "clutter"
 
-const int NUM_TREES = 100;
+const int NUM_TREES = 1000;
 
 
 
 // global light parameters
 
-//float   AmbR = 0.7, AmbG = 0.7, AmbB = 0.75;
 float   AmbR = 0.8, AmbG = 0.9, AmbB = 0.85;
 
 // Light 0 parameters

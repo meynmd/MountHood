@@ -18,6 +18,8 @@
 #include "bmpLoader.hpp"
 #include "mesh.hpp"
 
+#include <deque>
+
 
 // non-constant global variables:
 
@@ -28,6 +30,7 @@ int		DebugOn;				// != 0 means to print debugging info
 int		DepthCueOn;				// != 0 means to use intensity depth cueing
 int		MainWindow;				// window id for main graphics window
 float	Scale;					// scaling factor
+float   FollowScale;
 int		WhichColor;				// index into Colors[ ]
 int		WhichProjection;		// ORTHO or PERSP
 bool    Freeze;                 // true means pause the animation
@@ -35,10 +38,16 @@ int		Xmouse, Ymouse;			// mouse values
 float	Xrot, Yrot;				// rotation angles in degrees
 float   Time;
 
-// helicopter position
+point   LookatPositionFromCircle;
+
+// helicopter stuff
 
 float   HeliAltitude;           // desired altitude of helicopter
-point   HeliPosition;
+                                //point   HeliCurrentPosition;
+                                //point   HeliLastPosition;
+
+std::deque<point> heliPositions;
+
 point   HeliForwardVec;         // pointing in helicopter forward direction
 
 // mesh stuff
@@ -98,18 +107,22 @@ void	MouseMotion( int, int );
 void	Reset( );
 void	Resize( int, int );
 void	Visibility( int );
+
 void	Axes( float );
 void	HsvRgb( float[3], float [3] );
+
+void    ChooseTreePoints();
 void    ConstructLandscape( );
+void    DrawTrees();
+void    DrawTree(point p);
 void    DrawHelicopter( );
 void    InitListsFromMesh( );
 void    LoadLandscape( );
 void    MakeLandscapeList( );
 GLuint  MakeListFromMesh( Mesh* mesh );
 GLuint  SetupTexture( char* path );
-void    DrawTrees();
-void    ChooseTreePoints();
-void    DrawTree(point p);
+void    UpdateHelicopterPosition();
+
 
 /* ------------------------------------------------------------------------------- */
 
@@ -179,13 +192,18 @@ Display( )
     glEnable( GL_DEPTH_TEST );
     
     // set the viewport to a square centered in the window:
-    
+    /*
     GLsizei vx = glutGet( GLUT_WINDOW_WIDTH );
     GLsizei vy = glutGet( GLUT_WINDOW_HEIGHT );
     GLsizei v = vx < vy ? vx : vy;			// minimum dimension
     GLint xl = ( vx - v ) / 2;
     GLint yb = ( vy - v ) / 2;
     glViewport( xl, yb,  v, v );
+    */
+    
+    GLsizei wx = glutGet( GLUT_WINDOW_WIDTH );
+    GLsizei wy = glutGet( GLUT_WINDOW_HEIGHT );
+    glViewport(0., 0., wx, wy);
     
     // set the viewing volume:
     
@@ -194,7 +212,7 @@ Display( )
     if( WhichProjection == ORTHO )
         glOrtho( -3., 3.,     -3., 3.,     0.1, 1000. );
     else
-        gluPerspective( 90., 1.,	0.1, 1000. );
+        gluPerspective( 90., (double)wx / (double)wy,	0.1, 10000. );
     
     glMatrixMode( GL_MODELVIEW );
     glLoadIdentity( );
@@ -202,12 +220,50 @@ Display( )
     // set the eye position, look-at position, and up-vector:
     
     point viewpoint;
-    viewpoint.x = HeliPosition.x + CAM_RADIUS * HeliForwardVec.x;
-    viewpoint.z = HeliPosition.z + CAM_RADIUS * HeliForwardVec.z;
-    viewpoint.y = HeliPosition.y;
+    
+    UpdateHelicopterPosition();
+    
+    // get viewpoint from Helicopter forward vector
+    
+    /*
+    // trying to rotate vector about x axis. This isn't right...
+    point c2hVec { HeliForwardVec.x, 0., HeliForwardVec.z };
+    c2hVec.y = c2hVec.y * cosf(0.5 * M_PI) - c2hVec.z * sinf(0.5 * M_PI);
+    c2hVec.z = c2hVec.y * sinf(0.5 * M_PI) + c2hVec.z * sinf(0.5 * M_PI);
+    
+    viewpoint.x = HeliCurrentPosition.x - CAM_FOLLOW_DIST * c2hVec.x;
+    viewpoint.z = HeliCurrentPosition.z - CAM_FOLLOW_DIST * c2hVec.z;
+    viewpoint.y = HeliCurrentPosition.y - CAM_FOLLOW_DIST * c2hVec.y;
+    */
+    
+    // add some height above helicopter y coord. Ugly solution, but...
+    
+    point c2hVec { HeliForwardVec.x, 0., HeliForwardVec.z };
+    c2hVec.y = 0.35;
+    
+    point HeliCurrentPosition = heliPositions.front();
+    viewpoint.x = HeliCurrentPosition.x + CAM_FOLLOW_DIST * c2hVec.x;
+    viewpoint.z = HeliCurrentPosition.z + CAM_FOLLOW_DIST * c2hVec.z;
+    viewpoint.y = HeliCurrentPosition.y + CAM_FOLLOW_DIST * c2hVec.y;
+    
+//    printf("helicopter position: (%f, %f, %f)\n",
+//           HeliCurrentPosition.x, HeliCurrentPosition.y, HeliCurrentPosition.z);
+//    printf("heli forward vector: (%f, %f, %f)\n",
+//          HeliForwardVec.x, HeliForwardVec.y, HeliForwardVec.z);
+//    printf("viewpoint: (%f, %f, %f\n\n", viewpoint.x, viewpoint.y,viewpoint.z);
+
+    
+    // set look at
     
     if(LookFollows) {
-        gluLookAt(viewpoint.x, viewpoint.y, viewpoint.z, HeliPosition.x, HeliPosition.y, HeliPosition.z, 0., 1., 0.);
+        gluLookAt(viewpoint.x, viewpoint.y, viewpoint.z,
+                  HeliCurrentPosition.x, HeliCurrentPosition.y, HeliCurrentPosition.z,
+                  0., 1., 0.);
+        
+//        gluLookAt(0., HeliCurrentPosition.y, 0.,
+//                  HeliCurrentPosition.x, HeliCurrentPosition.y, HeliCurrentPosition.z,
+//                  0., 1., 0.);
+        
     }
     else {
         gluLookAt( 0., 10., -25.,     0., 0., 0.,     0., 1., 0. );
@@ -220,9 +276,15 @@ Display( )
 
     // uniformly scale the scene:
     
-    if( Scale < MINSCALE ) {
-        Scale = MINSCALE;
+    if(LookFollows) {
+        Scale = DEFAULT_FOLLOW_SCALE;
     }
+    else {
+        if( Scale < MINSCALE ) {
+            Scale = MINSCALE;
+        }
+    }
+    
     glScalef( (GLfloat)Scale, (GLfloat)Scale, (GLfloat)Scale );
     
     // set the fog parameters:
@@ -289,20 +351,6 @@ Display( )
     DrawHelicopter();
 
     
-    // trace line
-    
-    glDisable(GL_LIGHTING);
-    glDisable(GL_TEXTURE_2D);
-    
-    glLineWidth(5.f);
-    glBegin(GL_LINE);
-    glColor3f(1., 0., 0.);
-    glVertex3f(HeliPosition.x, HeliPosition.y, HeliPosition.z);
-    glVertex3f(0., 0., 0.);
-    glEnd();
-    glLineWidth(1.f);
-    
-    
     // draw some trees
     
     DrawTrees();
@@ -357,13 +405,13 @@ void DrawTrees() {
 
 void
 DrawTree(point p) {
-        
+    
         glPushMatrix();
         
     
             glTranslatef(p.x, p.y, p.z);
     
-            glScalef(0.0125, 0.0125, 0.0125);
+            glScalef(TREE_SCALE, TREE_SCALE, TREE_SCALE);
     
             SetMaterial( 0.3, 0.7, 0.2, 0. );
             glShadeModel(GL_SMOOTH);
@@ -381,6 +429,75 @@ DrawTree(point p) {
 
 
 void
+UpdateHelicopterPosition() {
+    float percent = HeliAnimRevs * Time;
+    float r = HeliAnimRadius;
+    
+    point HeliCurrentPosition;
+    
+    float x = HeliCurrentPosition.x = r * cosf(2. * M_PI * percent);
+    float z = HeliCurrentPosition.z = -r * sinf(2. * M_PI * percent);
+    float y = HeliCurrentPosition.y = HeliAltitude;
+    
+    float dx, dy, dz;
+    
+    /*
+    float ds = sqrtf(   (x - HeliLastPosition.x) * (x - HeliLastPosition.x) +
+                        (y - HeliLastPosition.y) * (y - HeliLastPosition.y) +
+                        (z - HeliLastPosition.z) * (z - HeliLastPosition.z) );
+    
+    if(ds < 10.f) {
+        dx = x - HeliLastPosition.x;
+        dy = y - HeliLastPosition.y;
+        dz = z - HeliLastPosition.z;
+    } else {
+        dx = 1.;            // arbitrary value; fix it later
+        dy = 1.;
+        dz = 1.;
+    }
+    */
+     
+    if(heliPositions.size() > HELI_LAG_FRAMES) {
+        heliPositions.pop_back();
+    }
+    
+    point prevHeliPosition;
+    if(heliPositions.size() > 0) {
+        point p = heliPositions.back();
+        prevHeliPosition.x = p.x;
+        prevHeliPosition.y = p.y;
+        prevHeliPosition.z = p.z;
+    } else {
+        prevHeliPosition.x = HeliCurrentPosition.x;
+        prevHeliPosition.y = HeliCurrentPosition.y;
+        prevHeliPosition.z = HeliCurrentPosition.z;
+    }
+    
+    float ds = sqrtf(   (x - prevHeliPosition.x) * (x - prevHeliPosition.x) +
+               (y - prevHeliPosition.y) * (y - prevHeliPosition.y) +
+               (z - prevHeliPosition.z) * (z - prevHeliPosition.z) );
+
+    dx = x - prevHeliPosition.x;
+    dy = y - prevHeliPosition.y;
+    dz = z - prevHeliPosition.z;
+    
+    //HeliCurrentPosition.x = x;     // update position variable
+    //HeliCurrentPosition.y = y;
+    //HeliCurrentPosition.z = z;
+    
+    HeliForwardVec.x = -dx / ds;
+    HeliForwardVec.y = -dy / ds;
+    HeliForwardVec.z = -dz / ds;
+    
+    //HeliLastPosition = HeliCurrentPosition;
+    
+    heliPositions.push_front(HeliCurrentPosition);
+    
+}
+
+
+
+void
 DrawHelicopter( ) {
     
     SetMaterial( 1., 1., 1., 5. );
@@ -392,30 +509,28 @@ DrawHelicopter( ) {
     
         // animate and draw the helicopter
         
-        float theta = HeliAnimRevs * Time;
-        glRotatef(360.f * theta, 0.f, 1.f, 0.f);
+        float percent = HeliAnimRevs * Time;
+        glRotatef(360.f * percent, 0.f, 1.f, 0.f);
         float r = HeliAnimRadius;
         glTranslatef(r, 0.f, 0.f);
         
         glTranslatef(0., HeliAltitude, 0.);
         
         glCallList( HelicopterList );
-        
-        
-        // calculate actual position and rotation of helicopter
-        
-        float x = HeliPosition.x = r * cosf(theta);
-        float z = HeliPosition.z = r * sinf(theta);
-        HeliPosition.y = HeliAltitude;
-        
-        float m = sqrtf(x * x + z * z);
-        HeliForwardVec.z = -x / m;
-        HeliForwardVec.x = z / m;
-        HeliForwardVec.y = 0.;
-        
-    //printf("helicopter position: (%f, %f, %f)\n", HeliPosition.x, HeliPosition.y, HeliPosition.z);
-    //printf("heli forward vector: (%f, %f, %f)\n\n", HeliForwardVec.x, HeliForwardVec.y, HeliForwardVec.z);
-
+    
+        // calculate where the lookat position should be
+        // for now, doing this using heli rotation angle
+    
+        float followAngle = 2. * M_PI * percent + 0.05 * M_PI;
+        LookatPositionFromCircle.x = cosf(followAngle);
+        LookatPositionFromCircle.z = sinf(followAngle);
+        LookatPositionFromCircle.y = HeliAltitude;
+    
+//        float m = sqrtf(x * x + z * z);
+//        HeliForwardVec.z = -x / m;
+//        HeliForwardVec.x = z / m;
+//        HeliForwardVec.y = 0.;
+    
         
         // draw the blades
          
@@ -665,31 +780,33 @@ LoadLandscape( ) {
     
     printf("Num Long: %d\nNum Lat: %d\n\n", NumElevLong, NumElevLat);
     
+    // Elevations has rows of longitudes
+    // build 2d array of elevations, LandscapeGrid
     
-    // build the 2d array of elevations
-    
-    LandscapeGrid = new point*[NumElevLat];
+    LandscapeGrid = new point*[NumElevLong];
+    for(int i = 0; i < NumElevLong; i++) {
+        LandscapeGrid[i] = new point[NumElevLat];
+    }
     
     for(int lat = 0; lat < NumElevLat; lat++ ) {
         
-        LandscapeGrid[lat] = new point[NumElevLong];
-        
         int offset = lat * NumElevLong;
         
-        for(int lng = 0; lng < NumElevLong; lng++) {
-            LandscapeGrid[lat][lng] = point {
+        for(int lon = 0; lon < NumElevLong; lon++) {
+            
+            LandscapeGrid[lon][lat] = point {
+                (float)lon,
+                Elevations[offset + lon],
                 (float)lat,
-                Elevations[offset + lng],
-                (float)lng,
                 0., 0., 0.
             };
             
             // center the point in xz,
             // shift y coordinate so lowest point is at y = 0
             
-            LandscapeGrid[lat][lng].x -= (float)NumElevLat / 2.;
-            LandscapeGrid[lat][lng].z -= (float)NumElevLong / 2.;
-            LandscapeGrid[lat][lng].y -= (LandscapeHeightMin - ELEV_BASE);
+            LandscapeGrid[lon][lat].x -= (float)NumElevLong / 2.;
+            LandscapeGrid[lon][lat].z -= (float)NumElevLat / 2.;
+            LandscapeGrid[lon][lat].y -= (LandscapeHeightMin - ELEV_BASE);
         }
     }
 }
@@ -701,9 +818,10 @@ void
 ConstructLandscape( ) {
     
     // initialize LandscapePoints
-    LandscapePoints = new point*[NumElevLat * LANDSCAPE_RES];
-    for (int i = 0; i < NumElevLat * LANDSCAPE_RES; i++) {
-        LandscapePoints[i] = new point[NumElevLong * LANDSCAPE_RES];
+    
+    LandscapePoints = new point*[NumElevLong * LANDSCAPE_RES];
+    for (int i = 0; i < NumElevLong * LANDSCAPE_RES; i++) {
+        LandscapePoints[i] = new point[NumElevLat * LANDSCAPE_RES];
     }
     
     // construct points to draw based on actual elevation data in LandscapeGrid
@@ -713,24 +831,24 @@ ConstructLandscape( ) {
             for(int j = 0; j < LANDSCAPE_RES; j++) {
                 for(int i = 0; i < LANDSCAPE_RES; i++) {
                     
-                    int xIdx = LANDSCAPE_RES * lat + j;
-                    int zIdx = LANDSCAPE_RES * lon + i;
+                    int latIdx = LANDSCAPE_RES * lat + j;
+                    int lonIdx = LANDSCAPE_RES * lon + i;
                     
                     // get x, y, z from LandscapeGrid
                     // then add fractional value to x and z for subdivision purposes
                     // scale y by LANDSCAPE_YSCALE
                     
-                    LandscapePoints[xIdx][zIdx] = point{
-                        LandscapeGrid[lat][lon].x + (float)j / (float)LANDSCAPE_RES,
-                        LandscapeGrid[lat][lon].y * LANDSCAPE_YSCALE,
-                        LandscapeGrid[lat][lon].z + (float)i / (float)LANDSCAPE_RES,
+                    LandscapePoints[lonIdx][latIdx] = point {
+                        LandscapeGrid[lon][lat].x + (float)j / (float)LANDSCAPE_RES,
+                        LandscapeGrid[lon][lat].y * LANDSCAPE_YSCALE,
+                        LandscapeGrid[lon][lat].z + (float)i / (float)LANDSCAPE_RES,
                         1., 1., 1.
                     };
                     
                     // scale the point in xz
                     
-                    LandscapePoints[xIdx][zIdx].x *= LANDSCAPE_XZSCALE;
-                    LandscapePoints[xIdx][zIdx].z *= LANDSCAPE_XZSCALE;
+                    LandscapePoints[lonIdx][latIdx].x *= LANDSCAPE_XZSCALE;
+                    LandscapePoints[lonIdx][latIdx].z *= LANDSCAPE_XZSCALE;
 
                 }
             }
@@ -743,71 +861,56 @@ ConstructLandscape( ) {
 void
 MakeLandscapeList( ) {
     
-    // landscape
-    
     LandscapeList = glGenLists(1);
     glNewList(LandscapeList, GL_COMPILE);
     
-    glPushMatrix();
+    int longestDim = (NumElevLong > NumElevLat) ? NumElevLong : NumElevLat;
+    int texIncLong = longestDim / TEX_TILE_FAC;
+    int texIncLat = texIncLong;
     
-        //LandscapePoints[lat][lon]
-        //                 x    z
+    //LandscapePoints[lon][lat]
+    //                 x    z
+    
+    
+    for(int x = 0; x < NumElevLong - 1; x++) {
+
+        glBegin(GL_TRIANGLE_STRIP);
         
-        for(int x = 0; x < NumElevLat * LANDSCAPE_RES - 1; x ++) {
+        for(int z = NumElevLat - 1; z > 0; z--) {
+        
+            // one vertex
             
-            for(int z = NumElevLong * LANDSCAPE_RES - 1; z > 0; z --) {
-                
-                glBegin(GL_TRIANGLE_STRIP);
-                
-                int longestDim = (NumElevLong > NumElevLat) ? NumElevLong : NumElevLat;
-                int texIncLong = longestDim / TEX_TILE_FAC;
-                int texIncLat = texIncLong;
-                
-                glTexCoord2f(
-                             (float)( x % texIncLat ) / texIncLat,
-                             (float)( z % texIncLong ) / texIncLong
-                             );
-                glNormal3f(0., 1., 0.);
-                glVertex3f(LandscapePoints[x][z].x,
-                           LandscapePoints[x][z].y,
-                           LandscapePoints[x][z].z);
-                
-                glTexCoord2f(
-                             (float)( (x+1) % texIncLat ) / texIncLat,
-                             (float)( z % texIncLong ) / texIncLong
-                             );
-                glNormal3f(0., 1., 0.);
-                glVertex3f(LandscapePoints[x+1][z].x,
-                           LandscapePoints[x+1][z].y,
-                           LandscapePoints[x+1][z].z);
-                
-                glTexCoord2f(
-                             (float)( x % texIncLat ) / texIncLat,
-                             (float)( (z-1) % texIncLong ) / texIncLong
-                             );
-                glNormal3f(0., 1., 0.);
-                glVertex3f(LandscapePoints[x][z-1].x,
-                           LandscapePoints[x][z-1].y,
-                           LandscapePoints[x][z-1].z);
-                
-                glTexCoord2f(
-                             (float)( (x+1) % texIncLat ) / texIncLat,
-                             (float)( (z-1) % texIncLong ) / texIncLong
-                             );
-                glNormal3f(0., 1., 0.);
-                glVertex3f(LandscapePoints[x+1][z-1].x,
-                           LandscapePoints[x+1][z-1].y,
-                           LandscapePoints[x+1][z-1].z);
-                
-                glEnd();
-            }
+            glTexCoord2f(
+                         (float)( x % texIncLat ) / texIncLat,
+                         (float)( z % texIncLong ) / texIncLong
+                        );
+        
+            glNormal3f(0., 1., 0.);
+        
+            glVertex3f(LandscapePoints[x][z].x,
+                       LandscapePoints[x][z].y,
+                       LandscapePoints[x][z].z);
+            
+            
+            // next vertex over one in x
+            
+            glTexCoord2f(
+                         (float)( (x+1) % texIncLat ) / texIncLat,
+                         (float)( z % texIncLong ) / texIncLong
+                         );
+            
+            glNormal3f(0., 1., 0.);
+            
+            glVertex3f(LandscapePoints[x+1][z].x,
+                       LandscapePoints[x+1][z].y,
+                       LandscapePoints[x+1][z].z);
+        }
+        
+        glEnd();
+
         }
     
-    glPopMatrix();
-    
     glEndList();
-
-    
 }
 
 
@@ -819,27 +922,26 @@ void ChooseTreePoints() {
     
     TreePoints = new point[NUM_TREES];
     
-    OccupiedLocations = new bool*[NumElevLat * LANDSCAPE_RES];
-    for(int i = 0; i < NumElevLat * LANDSCAPE_RES; i++) {
-        OccupiedLocations[i] = new bool[NumElevLong * LANDSCAPE_RES];
-        for(int j = 0; j < NumElevLong * LANDSCAPE_RES; j++) {
+    OccupiedLocations = new bool*[NumElevLong * LANDSCAPE_RES];
+    for(int i = 0; i < NumElevLong * LANDSCAPE_RES; i++) {
+        OccupiedLocations[i] = new bool[NumElevLat * LANDSCAPE_RES];
+        for(int j = 0; j < NumElevLat * LANDSCAPE_RES; j++) {
             OccupiedLocations[i][j] = false;
         }
     }
-    //memset((void*)OccupiedLocations, 0, NumElevLong * NumElevLat * LANDSCAPE_RES);
     
     for(int i = 0; i < NUM_TREES;) {
-        int x = rand() % NumElevLat;
-        int z = rand() % NumElevLong;
+        
+        int x = rand() % NumElevLong * LANDSCAPE_RES;
+        int z = rand() % NumElevLat * LANDSCAPE_RES;
         
         if(OccupiedLocations[x][z] == false) {
+            
             OccupiedLocations[x][z] = true;
             TreePoints[i] = point();
             TreePoints[i].x = LandscapePoints[x][z].x;
             TreePoints[i].y = LandscapePoints[x][z].y;
             TreePoints[i].z = LandscapePoints[x][z].z;
-            
-            //printf("Tree Point (%f, %f, %f)\n", TreePoints[i].x, TreePoints[i].y, TreePoints[i].z);
             
             i++;
         }
@@ -860,10 +962,6 @@ SetupTexture( char* path )
     if (Texture == NULL) {
         return -1;
     }
-    
-//    for (int i = 0; i < 3 * width * height; i += 3) {
-//        printf("(r: %d, g: %d, b: %d\n", Texture[i], Texture[i+1], Texture[i+2]);
-//    }
     
     glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
     
@@ -986,14 +1084,19 @@ Keyboard( unsigned char c, int x, int y )
     
     switch( c )
     {
+        case 'w':
+        case 'W':
+            HeliAltitude += HELI_ALT_INC;
+            break;
+            
+        case 's':
+        case 'S':
+            HeliAltitude -= HELI_ALT_INC;
+            break;
+            
         case 'c':
         case 'C':
             LookFollows = !LookFollows;
-            break;
-            
-        case 'r':
-        case 'R':
-            WhichMouseAction = SCALE;
             break;
             
         case 'e':
@@ -1025,6 +1128,13 @@ Keyboard( unsigned char c, int x, int y )
         case ESCAPE:
             DoMainMenu( QUIT );	// will not return here
             break;				// happy compiler
+            
+            
+        case 'r':
+        case 'R':
+            WhichMouseAction = SCALE;
+            break;
+            
             
         default:
             fprintf( stderr, "Don't know what to do with keyboard hit: '%c' (0x%0x)\n", c, c );
@@ -1149,13 +1259,16 @@ Reset( )
     AxesOn = 1;
     DebugOn = 0;
     DepthCueOn = 0;
-    Scale = 0.08;
+    Scale = 1.;
+    FollowScale = DEFAULT_FOLLOW_SCALE;
     WhichColor = WHITE;
     WhichProjection = PERSP;
-    Xrot = 8.;
-    Yrot = -1.;
+    Xrot = 0.;
+    Yrot = 0.;
     LookFollows = true;
     HeliAltitude = HeliInitAlt;
+    //HeliLastPosition.x = HeliLastPosition.y = HeliLastPosition.z = 0.;
+    //HeliCurrentPosition.x = HeliCurrentPosition.y = HeliCurrentPosition.z = 0.;
 }
 
 
@@ -1358,7 +1471,7 @@ HsvRgb( float hsv[3], float rgb[3] )
     float q = v * ( 1.f - s*f );
     float t = v * ( 1.f - ( s * (1.f-f) ) );
     
-    float r, g, b;			// red, green, blue
+    float r = 0.0, g, b;			// red, green, blue
     switch( (int) i )
     {
         case 0:
