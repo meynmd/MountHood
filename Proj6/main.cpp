@@ -5,6 +5,18 @@
  * based on the template...
  */
 
+
+// TODO:
+//
+// * Create proper normals
+// * Add different textures to landscape, unless it looks ugly
+// * Try to find some more meshes to add to landscape
+// * Try to fix texture seams in landscape
+// * Try to fix controls so the helicopter keeps turning until the button is released
+//
+
+
+
 //	A basic OpenGL / GLUT program
 //
 //	Author:			Joe Graphics
@@ -38,13 +50,14 @@ int		Xmouse, Ymouse;			// mouse values
 float	Xrot, Yrot;				// rotation angles in degrees
 float   Time;
 
+
+
 point   LookatPositionFromCircle;
 
 // helicopter stuff
 
 float   HeliAltitude;           // desired altitude of helicopter
-                                //point   HeliCurrentPosition;
-                                //point   HeliLastPosition;
+
 
 std::deque<point> heliPositions;
 
@@ -246,24 +259,12 @@ Display( )
     viewpoint.z = HeliCurrentPosition.z + CAM_FOLLOW_DIST * c2hVec.z;
     viewpoint.y = HeliCurrentPosition.y + CAM_FOLLOW_DIST * c2hVec.y;
     
-//    printf("helicopter position: (%f, %f, %f)\n",
-//           HeliCurrentPosition.x, HeliCurrentPosition.y, HeliCurrentPosition.z);
-//    printf("heli forward vector: (%f, %f, %f)\n",
-//          HeliForwardVec.x, HeliForwardVec.y, HeliForwardVec.z);
-//    printf("viewpoint: (%f, %f, %f\n\n", viewpoint.x, viewpoint.y,viewpoint.z);
-
-    
     // set look at
     
     if(LookFollows) {
         gluLookAt(viewpoint.x, viewpoint.y, viewpoint.z,
                   HeliCurrentPosition.x, HeliCurrentPosition.y, HeliCurrentPosition.z,
                   0., 1., 0.);
-        
-//        gluLookAt(0., HeliCurrentPosition.y, 0.,
-//                  HeliCurrentPosition.x, HeliCurrentPosition.y, HeliCurrentPosition.z,
-//                  0., 1., 0.);
-        
     }
     else {
         gluLookAt( 0., 10., -25.,     0., 0., 0.,     0., 1., 0. );
@@ -430,6 +431,16 @@ DrawTree(point p) {
 
 void
 UpdateHelicopterPosition() {
+    
+    if(HeliAnimRadius < HeliAnimRadiusMin) {
+        HeliAnimRadius = HeliAnimRadiusMin;
+    }
+    
+    if(HeliAnimRadius > HeliAnimRadiusMax) {
+        HeliAnimRadius = HeliAnimRadiusMax;
+    }
+
+    
     float percent = HeliAnimRevs * Time;
     float r = HeliAnimRadius;
     
@@ -515,28 +526,36 @@ DrawHelicopter( ) {
         glTranslatef(r, 0.f, 0.f);
         
         glTranslatef(0., HeliAltitude, 0.);
+    
+    if(heliPositions.size() > 0) {
         
+        // tilt the helicopter forwards or backwards in it's going down or up
+        
+        point prevPos = heliPositions.back();
+        float dy = heliPositions.front().y - prevPos.y;
+        glRotatef(TILT_X_FAC * dy / HELI_LAG_FRAMES, 1., 0., 0.);
+        
+        // left or right if turning
+        
+        float prevR = sqrtf(prevPos.x * prevPos.x + prevPos.z * prevPos.z);
+        float dr = HeliAnimRadius - prevR;
+        glRotatef(TILT_Y_FAC * -dr / HELI_LAG_FRAMES, 0., 1., 0.);
+        glRotatef(TILT_Z_FAC * -dr / HELI_LAG_FRAMES, 0., 0., 1.);
+    
+    }
+    
+        // add a slight tilt toward the center of the circle
+    
+        glRotatef(TILT_Z_AUTO_MAX * (1. - HeliAnimRadius / (1.25 * HeliAnimRadiusMax)),
+                  0., 0., 1.);
+    
         glCallList( HelicopterList );
-    
-        // calculate where the lookat position should be
-        // for now, doing this using heli rotation angle
-    
-        float followAngle = 2. * M_PI * percent + 0.05 * M_PI;
-        LookatPositionFromCircle.x = cosf(followAngle);
-        LookatPositionFromCircle.z = sinf(followAngle);
-        LookatPositionFromCircle.y = HeliAltitude;
-    
-//        float m = sqrtf(x * x + z * z);
-//        HeliForwardVec.z = -x / m;
-//        HeliForwardVec.x = z / m;
-//        HeliForwardVec.y = 0.;
-    
-        
+
         // draw the blades
          
         glShadeModel(GL_FLAT);
         SetMaterial(1., 1., 1., 9.);
-        glRotatef(100. * 360.f * Time, 0., 1., 0.);
+        glRotatef(HeliBladeRevsFac * 360.f * Time, 0., 1., 0.);
         glCallList(BladeList);
     
     
@@ -560,7 +579,7 @@ InitGraphics( )
     // set the initial window configuration:
     
     glutInitWindowPosition( 0, 0 );
-    glutInitWindowSize( INIT_WINDOW_SIZE, INIT_WINDOW_SIZE );
+    glutInitWindowSize( INIT_WINDOW_SIZE_W, INIT_WINDOW_SIZE_H );
     
     // open the window and set its title:
     
@@ -847,8 +866,8 @@ ConstructLandscape( ) {
                     
                     // scale the point in xz
                     
-                    LandscapePoints[lonIdx][latIdx].x *= LANDSCAPE_XZSCALE;
-                    LandscapePoints[lonIdx][latIdx].z *= LANDSCAPE_XZSCALE;
+                    LandscapePoints[lonIdx][latIdx].x *= LANDSCAPE_XSCALE;
+                    LandscapePoints[lonIdx][latIdx].z *= LANDSCAPE_ZSCALE;
 
                 }
             }
@@ -936,6 +955,12 @@ void ChooseTreePoints() {
         int z = rand() % NumElevLat * LANDSCAPE_RES;
         
         if(OccupiedLocations[x][z] == false) {
+            
+            // check whether this location is too high
+            
+            if(LandscapePoints[x][z].y > TREE_ELEV_MAX) {
+                continue;
+            }
             
             OccupiedLocations[x][z] = true;
             TreePoints[i] = point();
@@ -1086,12 +1111,22 @@ Keyboard( unsigned char c, int x, int y )
     {
         case 'w':
         case 'W':
-            HeliAltitude += HELI_ALT_INC;
+            HeliAltitude -= 15. * HELI_ALT_FAC;
             break;
             
         case 's':
         case 'S':
-            HeliAltitude -= HELI_ALT_INC;
+            HeliAltitude += 15. * HELI_ALT_FAC;
+            break;
+            
+        case 'a':
+        case 'A':
+            HeliAnimRadius -= 25. * HELI_TURN_FAC;
+            break;
+            
+        case 'd':
+        case 'D':
+            HeliAnimRadius += 25. * HELI_TURN_FAC;
             break;
             
         case 'c':
@@ -1178,7 +1213,7 @@ MouseButton( int button, int state, int x, int y )
     
     
     // button down sets the bit, up clears the bit:
-    
+
     if( state == GLUT_DOWN )
     {
         Xmouse = x;
@@ -1189,6 +1224,7 @@ MouseButton( int button, int state, int x, int y )
     {
         ActiveButton &= ~b;		// clear the proper bit
     }
+    
 }
 
 
@@ -1204,41 +1240,55 @@ MouseMotion( int x, int y )
     int dx = x - Xmouse;		// change in mouse coords
     int dy = y - Ymouse;
     
+    if(!LookFollows) {
+    
 #ifdef __APPLE__
-    // There's probably no middle mouse button, so use keys insted
-    if( ( ActiveButton & LEFT ) != 0 )
-    {
-        if(WhichMouseAction == ROTATE){
+        // There's probably no middle mouse button, so use keys insted
+        if( ( ActiveButton & LEFT ) != 0 )
+        {
+            if(WhichMouseAction == ROTATE){
+                Xrot += ( ANGFACT*dy );
+                Yrot += ( ANGFACT*dx );
+            } else {
+                Scale += SCLFACT * (float) ( dx - dy );
+                
+                // keep object from turning inside-out or disappearing:
+                
+                if( Scale < MINSCALE )
+                    Scale = MINSCALE;
+                
+            }
+        }
+#else
+        if( ( ActiveButton & LEFT ) != 0 )
+        {
             Xrot += ( ANGFACT*dy );
             Yrot += ( ANGFACT*dx );
-        } else {
+        }
+        
+        
+        if( ( ActiveButton & MIDDLE ) != 0 )
+        {
             Scale += SCLFACT * (float) ( dx - dy );
             
             // keep object from turning inside-out or disappearing:
             
             if( Scale < MINSCALE )
                 Scale = MINSCALE;
-            
+        }
+#endif
+    }
+    
+    // if in follow-camera mode
+    
+    else {
+        
+        if( ( ActiveButton & LEFT ) != 0 )
+        {
+            HeliAltitude += HELI_ALT_FAC * (float)dy;
+            HeliAnimRadius += HELI_TURN_FAC * (float)dx;
         }
     }
-#else
-    if( ( ActiveButton & LEFT ) != 0 )
-    {
-        Xrot += ( ANGFACT*dy );
-        Yrot += ( ANGFACT*dx );
-    }
-    
-    
-    if( ( ActiveButton & MIDDLE ) != 0 )
-    {
-        Scale += SCLFACT * (float) ( dx - dy );
-        
-        // keep object from turning inside-out or disappearing:
-        
-        if( Scale < MINSCALE )
-            Scale = MINSCALE;
-    }
-#endif
     
     Xmouse = x;			// new current position
     Ymouse = y;
@@ -1471,7 +1521,7 @@ HsvRgb( float hsv[3], float rgb[3] )
     float q = v * ( 1.f - s*f );
     float t = v * ( 1.f - ( s * (1.f-f) ) );
     
-    float r = 0.0, g, b;			// red, green, blue
+    float r, g, b;			// red, green, blue
     switch( (int) i )
     {
         case 0:

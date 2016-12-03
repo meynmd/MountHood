@@ -20,7 +20,8 @@ const char *GLUITITLE   = { "User Interface Window" };
 
 // initial window size:
 
-const int INIT_WINDOW_SIZE = { 900 };
+const int INIT_WINDOW_SIZE_W = { 1600 };
+const int INIT_WINDOW_SIZE_H = { 900 };
 
 
 // minimum allowable scale factor:
@@ -63,16 +64,25 @@ char TEXPATH_TREE[] = "pine_d.bmp";
 
 // animation params
 
-int     MS_PER_CYCLE = 60000;
+int     MS_PER_CYCLE = 300000;
 
 float   HeliInitAlt = 300.f;
-int     HeliAnimRevs = 2;
+int     HeliAnimInitRevs = 10;
+int     HeliAnimRevs = 10;
+int     HeliBladeRevsFac = 800;
 float   HeliAnimRadius = 2500.f;
+float   HeliAnimRadiusMin = 1000.f;
+float   HeliAnimRadiusMax = 3000.f;
 
-float   CAM_FOLLOW_DIST = 15.f;
-float   DEFAULT_FOLLOW_SCALE = 1.;
-float   HELI_LAG_FRAMES = 20.;
-float   HELI_ALT_INC = 4.;
+const float   CAM_FOLLOW_DIST = 15.f;
+const float   DEFAULT_FOLLOW_SCALE = 1.;
+const int     HELI_LAG_FRAMES = 20;
+const float   HELI_ALT_FAC = 0.25;
+const float   HELI_TURN_FAC = 0.075;
+const float   TILT_X_FAC = 5.;
+const float   TILT_Y_FAC = 5.;
+const float   TILT_Z_FAC = 3.;
+const float   TILT_Z_AUTO_MAX = 10.;
 
 // landscape parameters
 
@@ -80,8 +90,13 @@ const int LANDSCAPE_RES = 1;
 
 const int TEX_TILE_FAC = 4;
 
-const float ELEV_BASE = -1000.;
+const float ELEV_BASE = -1500.;
 const float LANDSCAPE_XZSCALE = 15.;
+
+const float LANDSCAPE_XSCALE = 10.56;
+const float LANDSCAPE_ZSCALE = 15.;
+
+
 const float LANDSCAPE_YSCALE = 0.4;
 
 const float TREE_SCALE = 0.25;
@@ -91,7 +106,7 @@ const float TREE_SCALE = 0.25;
 // landscape "clutter"
 
 const int NUM_TREES = 1000;
-
+const float TREE_ELEV_MAX = 500.;
 
 
 // global light parameters
