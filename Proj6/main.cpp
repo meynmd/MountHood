@@ -51,8 +51,12 @@ float	Xrot, Yrot;				// rotation angles in degrees
 float   Time;
 
 
+// controls stuff
 
-point   LookatPositionFromCircle;
+bool    ButtonDown;
+int     ButtonDownX, ButtonDownY;
+int     InputX, InputY;
+
 
 // helicopter stuff
 
@@ -432,6 +436,25 @@ DrawTree(point p) {
 void
 UpdateHelicopterPosition() {
     
+    printf("Helicopter y: %f\tx: %f\n", HELI_CLIMB_FAC * (float)InputY, HELI_TURN_FAC * (float)InputX);
+    
+    if(InputX > HELI_TURN_MAX) {
+        InputX = HELI_TURN_MAX;
+    }
+    if(InputX < -HELI_TURN_MAX) {
+        InputX = -HELI_TURN_MAX;
+    }
+    
+    if(InputY > HELI_CLIMB_MAX) {
+        InputY = HELI_CLIMB_MAX;
+    }
+    if(InputY < -HELI_CLIMB_MAX) {
+        InputY = -HELI_CLIMB_MAX;
+    }
+    
+    HeliAltitude += HELI_CLIMB_FAC * (float)InputY;
+    HeliAnimRadius += HELI_TURN_FAC * (float)InputX;
+    
     if(HeliAnimRadius < HeliAnimRadiusMin) {
         HeliAnimRadius = HeliAnimRadiusMin;
     }
@@ -451,22 +474,6 @@ UpdateHelicopterPosition() {
     float y = HeliCurrentPosition.y = HeliAltitude;
     
     float dx, dy, dz;
-    
-    /*
-    float ds = sqrtf(   (x - HeliLastPosition.x) * (x - HeliLastPosition.x) +
-                        (y - HeliLastPosition.y) * (y - HeliLastPosition.y) +
-                        (z - HeliLastPosition.z) * (z - HeliLastPosition.z) );
-    
-    if(ds < 10.f) {
-        dx = x - HeliLastPosition.x;
-        dy = y - HeliLastPosition.y;
-        dz = z - HeliLastPosition.z;
-    } else {
-        dx = 1.;            // arbitrary value; fix it later
-        dy = 1.;
-        dz = 1.;
-    }
-    */
      
     if(heliPositions.size() > HELI_LAG_FRAMES) {
         heliPositions.pop_back();
@@ -492,15 +499,9 @@ UpdateHelicopterPosition() {
     dy = y - prevHeliPosition.y;
     dz = z - prevHeliPosition.z;
     
-    //HeliCurrentPosition.x = x;     // update position variable
-    //HeliCurrentPosition.y = y;
-    //HeliCurrentPosition.z = z;
-    
     HeliForwardVec.x = -dx / ds;
     HeliForwardVec.y = -dy / ds;
     HeliForwardVec.z = -dz / ds;
-    
-    //HeliLastPosition = HeliCurrentPosition;
     
     heliPositions.push_front(HeliCurrentPosition);
     
@@ -880,22 +881,33 @@ ConstructLandscape( ) {
 void
 MakeLandscapeList( ) {
     
-    LandscapeList = glGenLists(1);
-    glNewList(LandscapeList, GL_COMPILE);
-    
     int longestDim = (NumElevLong > NumElevLat) ? NumElevLong : NumElevLat;
     int texIncLong = longestDim / TEX_TILE_FAC;
     int texIncLat = texIncLong;
     
+    
+//    int longestDim;
+//    int texTileWidth;
+    //    if(NumElevLat > NumElevLong) {
+    //        texTileWidth = (int)(
+    //                             (float)(NumElevLat * LANDSCAPE_RES) / (float)TEX_TILES);
+    //    }
+    //    else {
+    //        texTileWidth = (int)(
+    //                             (float)(NumElevLong * LANDSCAPE_RES) / (float)TEX_TILES);
+    //    }
+
+    
     //LandscapePoints[lon][lat]
     //                 x    z
     
-    
-    for(int x = 0; x < NumElevLong - 1; x++) {
+    LandscapeList = glGenLists(1);
+    glNewList(LandscapeList, GL_COMPILE);
+    for(int x = 0; x < NumElevLong * LANDSCAPE_RES - 1; x++) {
 
         glBegin(GL_TRIANGLE_STRIP);
         
-        for(int z = NumElevLat - 1; z > 0; z--) {
+        for(int z = NumElevLat * LANDSCAPE_RES - 1; z > 0; z--) {
         
             // one vertex
             
@@ -909,7 +921,6 @@ MakeLandscapeList( ) {
             glVertex3f(LandscapePoints[x][z].x,
                        LandscapePoints[x][z].y,
                        LandscapePoints[x][z].z);
-            
             
             // next vertex over one in x
             
@@ -928,7 +939,6 @@ MakeLandscapeList( ) {
         glEnd();
 
         }
-    
     glEndList();
 }
 
@@ -1111,12 +1121,12 @@ Keyboard( unsigned char c, int x, int y )
     {
         case 'w':
         case 'W':
-            HeliAltitude -= 15. * HELI_ALT_FAC;
+            HeliAltitude -= 15. * HELI_CLIMB_FAC;
             break;
             
         case 's':
         case 'S':
-            HeliAltitude += 15. * HELI_ALT_FAC;
+            HeliAltitude += 15. * HELI_CLIMB_FAC;
             break;
             
         case 'a':
@@ -1216,13 +1226,29 @@ MouseButton( int button, int state, int x, int y )
 
     if( state == GLUT_DOWN )
     {
-        Xmouse = x;
-        Ymouse = y;
+        if(!ButtonDown) {
+            
+            Xmouse = x;
+            Ymouse = y;
+            
+            ButtonDownX = x;
+            ButtonDownY = y;
+        }
+        
         ActiveButton |= b;		// set the proper bit
+        
+        ButtonDown = true;
     }
     else
     {
         ActiveButton &= ~b;		// clear the proper bit
+        
+        ButtonDown = false;
+        
+        ButtonDownX = 0;
+        ButtonDownY = 0;
+        InputX = 0;
+        InputY = 0;
     }
     
 }
@@ -1285,13 +1311,19 @@ MouseMotion( int x, int y )
         
         if( ( ActiveButton & LEFT ) != 0 )
         {
-            HeliAltitude += HELI_ALT_FAC * (float)dy;
-            HeliAnimRadius += HELI_TURN_FAC * (float)dx;
+            InputX = x - ButtonDownX;
+            InputY = y - ButtonDownY;
+
+            //HeliAltitude += HELI_ALT_FAC * (float)dy;
+            //HeliAnimRadius += HELI_TURN_FAC * (float)dx;
         }
     }
     
     Xmouse = x;			// new current position
     Ymouse = y;
+    
+    printf("\tXmouse = %d, Ymouse = %d\n", x, y);
+
     
     glutSetWindow( MainWindow );
     glutPostRedisplay( );
@@ -1317,8 +1349,8 @@ Reset( )
     Yrot = 0.;
     LookFollows = true;
     HeliAltitude = HeliInitAlt;
-    //HeliLastPosition.x = HeliLastPosition.y = HeliLastPosition.z = 0.;
-    //HeliCurrentPosition.x = HeliCurrentPosition.y = HeliCurrentPosition.z = 0.;
+    InputX = InputY = 0;
+    ButtonDown = false;
 }
 
 

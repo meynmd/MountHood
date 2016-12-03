@@ -77,11 +77,15 @@ float   HeliAnimRadiusMax = 3000.f;
 const float   CAM_FOLLOW_DIST = 15.f;
 const float   DEFAULT_FOLLOW_SCALE = 1.;
 const int     HELI_LAG_FRAMES = 20;
-const float   HELI_ALT_FAC = 0.25;
-const float   HELI_TURN_FAC = 0.075;
+
+const float   HELI_CLIMB_FAC = 0.05;
+const float   HELI_CLIMB_MAX = 100.;
+const float   HELI_TURN_FAC = 0.002;
+const float   HELI_TURN_MAX = 1000.;
+
 const float   TILT_X_FAC = 5.;
 const float   TILT_Y_FAC = 5.;
-const float   TILT_Z_FAC = 3.;
+const float   TILT_Z_FAC = 3.5;
 const float   TILT_Z_AUTO_MAX = 10.;
 
 // landscape parameters
@@ -89,6 +93,8 @@ const float   TILT_Z_AUTO_MAX = 10.;
 const int LANDSCAPE_RES = 1;
 
 const int TEX_TILE_FAC = 4;
+
+const int TEX_TILES = 16;
 
 const float ELEV_BASE = -1500.;
 const float LANDSCAPE_XZSCALE = 15.;
