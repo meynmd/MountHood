@@ -91,7 +91,9 @@ const float   TILT_Z_AUTO_MAX = 10.;
 
 // landscape parameters
 
-const int LANDSCAPE_RES = 2;
+const float WATER_LEVEL = -375.;
+
+const int LANDSCAPE_RES = 1;
 
 const int TEX_TILES = 2;
 
@@ -116,60 +118,60 @@ const float TREE_ELEV_MAX = 500.;
 
 // global light parameters
 
-float   AmbR = 0.3, AmbG = 0.3, AmbB = 0.3;
+float   AmbR = 0.4, AmbG = 0.5, AmbB = 0.6;
 
-// Light 0 parameters
+// Light 0 parameters (out in positive z)
 
 float   L0x = 0.,
         L0y = 5000.,
         L0z = 500000.;
 
-float   L0r = 0.425,
-        L0g = 0.475,
-        L0b = 0.475;
+float   L0r = 0.8,
+        L0g = 0.8,
+        L0b = 0.8;
 
 
-// Light 1 parameters
+// Light 1 parameters (negative z)
 
 float   L1x = 0.,
         L1y = 5000.,
         L1z = -500000.;
 
-float   L1r = 0.375,
-        L1g = 0.425,
-        L1b = 0.45;
+float   L1r = 0.65,
+        L1g = 0.75,
+        L1b = 0.8;
 
 
-// Light 2 parameters
+// Light 2 parameters (positive x)
 
 float   L2x = 500000.,
         L2y = 5000.,
         L2z = 0.;
 
-float   L2r = 0.4,
-        L2g = 0.4,
-        L2b = 0.4;
+float   L2r = 0.7,
+        L2g = 0.7,
+        L2b = 0.65;
 
 
-// Light 3 parameters
+// Light 3 parameters (negative x)
 
 float   L3x = -500000.,
         L3y = 5000.,
         L3z = 0.;
 
-float   L3r = 0.375,
-        L3g = 0.375,
-        L3b = 0.35;
+float   L3r = 0.525,
+        L3g = 0.525,
+        L3b = 0.5;
 
 
 // Light 4 parameters
 
 float   L4x = 0.,
-        L4y = 5000.,
+        L4y = 1000.,
         L4z = 0.;
 
-float   L4r = 0.35,
-        L4g = 0.35,
-        L4b = 0.35;
+float   L4r = 0.75,
+        L4g = 0.75,
+        L4b = 0.75;
 
 #endif

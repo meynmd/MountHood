@@ -48,7 +48,9 @@ SetPointLight( int ilight, float x, float y, float z,  float r, float g, float b
     glLightfv( ilight, GL_POSITION,  Array3( x, y, z ) );
     glLightfv( ilight, GL_AMBIENT,   Array3( 0., 0., 0. ) );
     glLightfv( ilight, GL_DIFFUSE,   Array3( r, g, b ) );
-    glLightfv( ilight, GL_SPECULAR,  Array3( r, g, b ) );
+    //glLightfv( ilight, GL_SPECULAR,  Array3( r, g, b ) );
+    glLightfv( ilight, GL_SPECULAR,  Array3( 0., 0., 0. ) );
+
     glLightf ( ilight, GL_CONSTANT_ATTENUATION, 1. );
     glLightf ( ilight, GL_LINEAR_ATTENUATION, 0. );
     glLightf ( ilight, GL_QUADRATIC_ATTENUATION, 0. );

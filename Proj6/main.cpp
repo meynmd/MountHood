@@ -8,11 +8,9 @@
 
 // TODO:
 //
-// * Create proper normals
 // * Add different textures to landscape, unless it looks ugly
 // * Try to find some more meshes to add to landscape
 // * Try to fix texture seams in landscape
-// * Try to fix controls so the helicopter keeps turning until the button is released
 //
 
 
@@ -325,10 +323,22 @@ Display( )
         glutSolidSphere(100., 10., 10.);
     glPopMatrix();
 
+    // draw "water"
     
-
+    glBegin(GL_QUADS);
+    glColor3f(0., 0.5, 0.75);
     
-    
+    glVertex3f(LandscapePoints[0][0].x, WATER_LEVEL, LandscapePoints[0][0].z);
+    glVertex3f(LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][0].x,
+               WATER_LEVEL,
+               LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][0].z);
+    glVertex3f(LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][NumElevLat*LANDSCAPE_RES - 1].x,
+               WATER_LEVEL,
+               LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][NumElevLat*LANDSCAPE_RES - 1].z);
+    glVertex3f(LandscapePoints[0][NumElevLat*LANDSCAPE_RES - 1].x,
+               WATER_LEVEL,
+               LandscapePoints[0][NumElevLat*LANDSCAPE_RES - 1].z);
+    glEnd();
     
     // draw the landscape
     
@@ -880,20 +890,17 @@ ConstructLandscape( ) {
                     int latIdx = LANDSCAPE_RES * lat + latSubd;
                     int lonIdx = LANDSCAPE_RES * lon + lonSubd;
                     
-                    // get x, y, z from LandscapeGrid
-                    // then add fractional value to x and z for subdivision purposes
-                    // scale y by LANDSCAPE_YSCALE
-                    
                     // get average height
                     
-                    float height;
-                    if(lat < NumElevLat - 1 && lon < NumElevLong - 1) {
-                        height = (LandscapeGrid[lon][lat].y +
-                                        LandscapeGrid[lon + 1][lat].y +
-                                        LandscapeGrid[lon][lat + 1].y +
-                                        LandscapeGrid[lon + 1][lat + 1].y) / 4.;
-                    } else {
-                        height = LandscapeGrid[lon][lat].y;
+                    float height = LandscapeGrid[lon][lat].y;
+                    
+                    if(latSubd > 0 && latSubd < LANDSCAPE_RES && lonSubd > 0 && lonSubd < LANDSCAPE_RES) {
+                        if(lat < NumElevLat - 1 && lon < NumElevLong - 1) {
+                            height = (      LandscapeGrid[lon][lat].y +
+                                            LandscapeGrid[lon + 1][lat].y +
+                                            LandscapeGrid[lon][lat + 1].y +
+                                            LandscapeGrid[lon + 1][lat + 1].y) / 4.;
+                        }
                     }
                     
                     LandscapePoints[lonIdx][latIdx] = point {
@@ -908,7 +915,7 @@ ConstructLandscape( ) {
                     /*
                     LandscapeVertexNormals[lonIdx][latIdx] = LandscapeNormals[lon][lat];
                     
-                    // average the normals of subdiv points
+                    // average the normals of in-between points
                     
 
                     if(lon < NumElevLong - 1 && lat < NumElevLat - 1) {
@@ -947,21 +954,7 @@ ConstructLandscape( ) {
 }
 
 
-/*
-point
-FindNormal(int lon, int lat) {
-    
-    return FindCross(
-                     point{ LandscapeGrid[lon - 1][lat].x - LandscapeGrid[lon + 1][lat].x,
-                            LandscapeGrid[lon - 1][lat].y - LandscapeGrid[lon + 1][lat].y,
-                            LandscapeGrid[lon - 1][lat].z - LandscapeGrid[lon + 1][lat].z
-                     },
-                     point{ LandscapeGrid[lon][lat - 1].x - LandscapeGrid[lon][lat + 1].x,
-                            LandscapeGrid[lon][lat - 1].y - LandscapeGrid[lon][lat + 1].y,
-                            LandscapeGrid[lon][lat - 1].z - LandscapeGrid[lon][lat + 1].z
-                     } );
-}
-*/
+
 
 point
 FindNormal(point** grid, int lon, int lat) {
@@ -982,8 +975,9 @@ FindNormal(point** grid, int lon, int lat) {
 void
 LandscapeVertex(int lon, int lat, int texTileWidth) {
     
-    float s = (float)((int)LandscapePoints[lon][lat].x % texTileWidth) / texTileWidth;
-    float t = (float)((int)LandscapePoints[lon][lat].z % texTileWidth) / texTileWidth;
+    float s = (float)((int)fabs(LandscapePoints[lon][lat].x) % texTileWidth) / texTileWidth;
+    float t = (float)((int)fabs(LandscapePoints[lon][lat].z) % texTileWidth) / texTileWidth;
+    
     glTexCoord2f(s, t);
     
     point normal;
@@ -1007,7 +1001,7 @@ LandscapeVertex(int lon, int lat, int texTileWidth) {
 
 void
 MakeLandscapeList( ) {
-    
+
     for(int lat = 1; lat < NumElevLat * LANDSCAPE_RES - 1; lat++) {
         for(int lon = 1; lon < NumElevLong * LANDSCAPE_RES - 1; lon++) {
             LandscapeVertexNormals[lon][lat] = FindNormal(LandscapePoints, lon, lat);
@@ -1053,92 +1047,6 @@ MakeLandscapeList( ) {
 
 
 
-//void
-//DrawLandscape( ) {
-//    
-//    // make texTileWidth the width of a texture tile
-//    
-//    int texTileWidth;
-//    if(NumElevLat > NumElevLong) {
-//        texTileWidth = (int)(
-//                             (float)(NumElevLat * LANDSCAPE_RES) / (float)TEX_TILES);
-//    }
-//    else {
-//        texTileWidth = (int)(
-//                             (float)(NumElevLong * LANDSCAPE_RES) / (float)TEX_TILES);
-//    }
-//    
-//    //LandscapePoints[lon][lat]
-//    //                 x    z
-//
-//    for(int lon = 1; lon < NumElevLong * LANDSCAPE_RES - 2; lon++) {
-//        
-//        glBegin(GL_TRIANGLE_STRIP);
-//        
-//        for(int lat = NumElevLat * LANDSCAPE_RES - 2; lat > 0; lat--) {
-//            
-//            // one vertex
-//            
-//            if(LandscapePoints[lon][lat].y < MIN_SNOW_LEVEL) {
-//                glBindTexture(GL_TEXTURE_2D, GroundTexture);
-//            }
-//            else {
-//                glBindTexture(GL_TEXTURE_2D, SnowTexture);
-//            }
-//            
-//            float s = (float)((int)LandscapePoints[lon][lat].x % texTileWidth) / texTileWidth;
-//            float t = (float)((int)LandscapePoints[lon][lat].z % texTileWidth) / texTileWidth;
-//            glTexCoord2f(s, t);
-//            
-//            point normal;
-//            if(UseNormals) {
-//                normal = FindNormal(lon, lat);
-//            } else {
-//                normal = point {0., 1., 0.};
-//            }
-//            
-//            glNormal3f(normal.x, normal.y, normal.z);
-//            
-//            
-//            
-//            glVertex3f(LandscapePoints[lon][lat].x,
-//                       LandscapePoints[lon][lat].y,
-//                       LandscapePoints[lon][lat].z);
-//            
-//            
-//            // next vertex, over one in x
-//            
-//            if(LandscapePoints[lon + 1][lat].y < MIN_SNOW_LEVEL) {
-//                glBindTexture(GL_TEXTURE_2D, GroundTexture);
-//            }
-//            else {
-//                glBindTexture(GL_TEXTURE_2D, SnowTexture);
-//            }
-//            
-//            
-//            s = (float)((int)LandscapePoints[lon+1][lat].x % texTileWidth) / texTileWidth;
-//            t = (float)((int)LandscapePoints[lon+1][lat].z % texTileWidth) / texTileWidth;
-//            
-//            glTexCoord2f(s, t);
-//            
-//            if(UseNormals) {
-//                normal = FindNormal(lon + 1, lat);
-//            } else {
-//                normal = point {0., 1., 0.};
-//                
-//            }
-//            
-//            glNormal3f(normal.x, normal.y, normal.z);
-//            
-//            glVertex3f(LandscapePoints[lon+1][lat].x,
-//                       LandscapePoints[lon+1][lat].y,
-//                       LandscapePoints[lon+1][lat].z);
-//        }
-//        
-//        glEnd();
-//        
-//    }
-//}
 
 
 
