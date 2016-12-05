@@ -57,7 +57,9 @@ const char MODELPATH_BLADES[] = "heliBlades_mesh.obj";
 const char MODELPATH_TREE[] = "pine4.obj";
 
 char TEXPATH_HELI[] = "heli_d.bmp";
-char TEXPATH_GROUND[] = "snow3_d.bmp";
+char TEXPATH_SNOW[] = "snow3_d.bmp";
+char TEXPATH_GROUND[] = "dirt_d.bmp";
+
 char TEXPATH_TREE[] = "pine_d.bmp";
 
 
@@ -92,9 +94,9 @@ const float   TILT_Z_AUTO_MAX = 10.;
 
 const int LANDSCAPE_RES = 1;
 
-const int TEX_TILE_FAC = 4;
+const int TEX_TILE_FAC = 8;
 
-const int TEX_TILES = 16;
+const int TEX_TILES = 2;
 
 const float ELEV_BASE = -1500.;
 const float LANDSCAPE_XZSCALE = 15.;
@@ -107,6 +109,9 @@ const float LANDSCAPE_YSCALE = 0.4;
 
 const float TREE_SCALE = 0.25;
 
+const float MIN_SNOW_LEVEL = 10.;
+
+bool UseNormals = false;
 
 
 // landscape "clutter"
@@ -117,18 +122,28 @@ const float TREE_ELEV_MAX = 500.;
 
 // global light parameters
 
-float   AmbR = 0.8, AmbG = 0.9, AmbB = 0.85;
+float   AmbR = 0., AmbG = 0., AmbB = 0.;
 
 // Light 0 parameters
 
-float   L0x = -60.,
+float   L0x = 0.,
         L0y = 5000.,
-        L0z = 60.;
+        L0z = 50.;
 
 float   L0r = 0.7,
         L0g = 0.7,
         L0b = 0.8;
 
+
+// Light 1 parameters
+
+float   L1x = 0.,
+        L1y = 5000.,
+        L1z = -50.;
+
+float   L1r = 0.7,
+        L1g = 0.7,
+        L1b = 0.8;
 
 
 

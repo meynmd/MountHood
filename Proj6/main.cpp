@@ -77,6 +77,7 @@ Mesh*   HeliBlades;
 
 GLuint  HeliTexture;            // the helicopter's texture handle
 GLuint  GroundTexture;          // ground texture handle
+GLuint  SnowTexture;
 GLuint  TreeTexture;
 
 
@@ -126,10 +127,15 @@ void	Resize( int, int );
 void	Visibility( int );
 
 void	Axes( float );
+void    Cross( float v1[3], float v2[3], float vout[3] );
+point   FindCross(point p1, point p2);
 void	HsvRgb( float[3], float [3] );
 
 void    ChooseTreePoints();
 void    ConstructLandscape( );
+
+void    DrawLandscape( );
+
 void    DrawTrees();
 void    DrawTree(point p);
 void    DrawHelicopter( );
@@ -208,16 +214,8 @@ Display( )
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
     glEnable( GL_DEPTH_TEST );
     
-    // set the viewport to a square centered in the window:
-    /*
-    GLsizei vx = glutGet( GLUT_WINDOW_WIDTH );
-    GLsizei vy = glutGet( GLUT_WINDOW_HEIGHT );
-    GLsizei v = vx < vy ? vx : vy;			// minimum dimension
-    GLint xl = ( vx - v ) / 2;
-    GLint yb = ( vy - v ) / 2;
-    glViewport( xl, yb,  v, v );
-    */
-    
+    // set the viewport
+
     GLsizei wx = glutGet( GLUT_WINDOW_WIDTH );
     GLsizei wy = glutGet( GLUT_WINDOW_HEIGHT );
     glViewport(0., 0., wx, wy);
@@ -241,18 +239,6 @@ Display( )
     UpdateHelicopterPosition();
     
     // get viewpoint from Helicopter forward vector
-    
-    /*
-    // trying to rotate vector about x axis. This isn't right...
-    point c2hVec { HeliForwardVec.x, 0., HeliForwardVec.z };
-    c2hVec.y = c2hVec.y * cosf(0.5 * M_PI) - c2hVec.z * sinf(0.5 * M_PI);
-    c2hVec.z = c2hVec.y * sinf(0.5 * M_PI) + c2hVec.z * sinf(0.5 * M_PI);
-    
-    viewpoint.x = HeliCurrentPosition.x - CAM_FOLLOW_DIST * c2hVec.x;
-    viewpoint.z = HeliCurrentPosition.z - CAM_FOLLOW_DIST * c2hVec.z;
-    viewpoint.y = HeliCurrentPosition.y - CAM_FOLLOW_DIST * c2hVec.y;
-    */
-    
     // add some height above helicopter y coord. Ugly solution, but...
     
     point c2hVec { HeliForwardVec.x, 0., HeliForwardVec.z };
@@ -341,13 +327,21 @@ Display( )
     glLightf ( GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1);
     glEnable(GL_LIGHT0);
     
+    SetPointLight(GL_LIGHT1, L1x, L1y, L1z, L1r, L1g, L1b);
+    glLightf ( GL_LIGHT1, GL_CONSTANT_ATTENUATION, 1);
+    glEnable(GL_LIGHT1);
+    
     
     // draw the landscape
     
     glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, GroundTexture);
-    SetMaterial(1., 1., 1., 0.);
+    
+    glBindTexture(GL_TEXTURE_2D, SnowTexture);
+    SetMaterial(1., .9, 1., 0.);
+    
     glCallList(LandscapeList);
+    
+    
     glDisable(GL_TEXTURE_2D);
     
     
@@ -418,7 +412,7 @@ DrawTree(point p) {
     
             glScalef(TREE_SCALE, TREE_SCALE, TREE_SCALE);
     
-            SetMaterial( 0.3, 0.7, 0.2, 0. );
+            SetMaterial( 0.7, 0.8, 0.7, 0. );
             glShadeModel(GL_SMOOTH);
             glEnable(GL_TEXTURE_2D);
             glBindTexture(GL_TEXTURE_2D, TreeTexture);
@@ -435,8 +429,6 @@ DrawTree(point p) {
 
 void
 UpdateHelicopterPosition() {
-    
-    printf("Helicopter y: %f\tx: %f\n", HELI_CLIMB_FAC * (float)InputY, HELI_TURN_FAC * (float)InputX);
     
     if(InputX > HELI_TURN_MAX) {
         InputX = HELI_TURN_MAX;
@@ -663,7 +655,13 @@ InitGraphics( )
     
     GroundTexture = SetupTexture(TEXPATH_GROUND);
     if(!GroundTexture) {
-        fprintf(stderr, "Couldn't load landscape texture\n");
+        fprintf(stderr, "Couldn't load ground texture\n");
+        exit(1);
+    }
+    
+    SnowTexture = SetupTexture(TEXPATH_SNOW);
+    if(!SnowTexture) {
+        fprintf(stderr, "Couldn't load snow texture\n");
         exit(1);
     }
     
@@ -848,20 +846,20 @@ ConstructLandscape( ) {
     
     for(int lat = 0; lat < NumElevLat; lat++) {
         for(int lon = 0; lon < NumElevLong; lon++) {
-            for(int j = 0; j < LANDSCAPE_RES; j++) {
-                for(int i = 0; i < LANDSCAPE_RES; i++) {
+            for(int latSubd = 0; latSubd < LANDSCAPE_RES; latSubd++) {
+                for(int lonSubd = 0; lonSubd < LANDSCAPE_RES; lonSubd++) {
                     
-                    int latIdx = LANDSCAPE_RES * lat + j;
-                    int lonIdx = LANDSCAPE_RES * lon + i;
+                    int latIdx = LANDSCAPE_RES * lat + latSubd;
+                    int lonIdx = LANDSCAPE_RES * lon + lonSubd;
                     
                     // get x, y, z from LandscapeGrid
                     // then add fractional value to x and z for subdivision purposes
                     // scale y by LANDSCAPE_YSCALE
                     
                     LandscapePoints[lonIdx][latIdx] = point {
-                        LandscapeGrid[lon][lat].x + (float)j / (float)LANDSCAPE_RES,
+                        LandscapeGrid[lon][lat].x + (float)lonSubd / (float)LANDSCAPE_RES,
                         LandscapeGrid[lon][lat].y * LANDSCAPE_YSCALE,
-                        LandscapeGrid[lon][lat].z + (float)i / (float)LANDSCAPE_RES,
+                        LandscapeGrid[lon][lat].z + (float)latSubd / (float)LANDSCAPE_RES,
                         1., 1., 1.
                     };
                     
@@ -878,68 +876,219 @@ ConstructLandscape( ) {
 
 
 
+point
+FindNormal(int x, int z) {
+    
+    return FindCross(
+                     point{ LandscapePoints[x - 1][z].x - LandscapePoints[x + 1][z].x,
+                            LandscapePoints[x - 1][z].y - LandscapePoints[x + 1][z].y,
+                            LandscapePoints[x - 1][z].z - LandscapePoints[x + 1][z].z
+                     },
+                     point{ LandscapePoints[x][z - 1].x - LandscapePoints[x][z + 1].x,
+                            LandscapePoints[x][z - 1].y - LandscapePoints[x][z + 1].y,
+                            LandscapePoints[x][z - 1].x - LandscapePoints[x][z + 1].x
+                     } );
+}
+
+
+
+
+void
+LandscapeVertex(int lon, int lat, int texTileWidth) {
+    
+    float s = (float)((int)LandscapePoints[lon][lat].x % texTileWidth) / texTileWidth;
+    float t = (float)((int)LandscapePoints[lon][lat].z % texTileWidth) / texTileWidth;
+    glTexCoord2f(s, t);
+    
+    point normal;
+    if(UseNormals) {
+        normal = FindNormal(lon, lat);
+    } else {
+        normal = point {0., 1., 0.};
+    }
+    
+    glNormal3f(normal.x, normal.y, normal.z);
+    
+    
+    
+    glVertex3f(LandscapePoints[lon][lat].x,
+               LandscapePoints[lon][lat].y,
+               LandscapePoints[lon][lat].z);
+
+}
+
+
+
 void
 MakeLandscapeList( ) {
     
-    int longestDim = (NumElevLong > NumElevLat) ? NumElevLong : NumElevLat;
-    int texIncLong = longestDim / TEX_TILE_FAC;
-    int texIncLat = texIncLong;
+    // make texTileWidth the width of a texture tile
     
-    
-//    int longestDim;
-//    int texTileWidth;
-    //    if(NumElevLat > NumElevLong) {
-    //        texTileWidth = (int)(
-    //                             (float)(NumElevLat * LANDSCAPE_RES) / (float)TEX_TILES);
-    //    }
-    //    else {
-    //        texTileWidth = (int)(
-    //                             (float)(NumElevLong * LANDSCAPE_RES) / (float)TEX_TILES);
-    //    }
-
+    int texTileWidth;
+        if(NumElevLat > NumElevLong) {
+            texTileWidth = (int)(
+                                 (float)(NumElevLat * LANDSCAPE_RES) / (float)TEX_TILES);
+        }
+        else {
+            texTileWidth = (int)(
+                                 (float)(NumElevLong * LANDSCAPE_RES) / (float)TEX_TILES);
+        }
     
     //LandscapePoints[lon][lat]
     //                 x    z
     
     LandscapeList = glGenLists(1);
     glNewList(LandscapeList, GL_COMPILE);
-    for(int x = 0; x < NumElevLong * LANDSCAPE_RES - 1; x++) {
+    for(int lon = 1; lon < NumElevLong * LANDSCAPE_RES - 2; lon++) {
 
         glBegin(GL_TRIANGLE_STRIP);
         
-        for(int z = NumElevLat * LANDSCAPE_RES - 1; z > 0; z--) {
-        
+        for(int lat = NumElevLat * LANDSCAPE_RES - 2; lat > 0; lat--) {
+            
             // one vertex
+ /*
+            float s = (float)((int)LandscapePoints[lon][lat].x % texTileWidth) / texTileWidth;
+            float t = (float)((int)LandscapePoints[lon][lat].z % texTileWidth) / texTileWidth;
+            glTexCoord2f(s, t);
             
-            glTexCoord2f(
-                         (float)( x % texIncLat ) / texIncLat,
-                         (float)( z % texIncLong ) / texIncLong
-                        );
-        
-            glNormal3f(0., 1., 0.);
-        
-            glVertex3f(LandscapePoints[x][z].x,
-                       LandscapePoints[x][z].y,
-                       LandscapePoints[x][z].z);
+            point normal;
+            if(UseNormals) {
+                normal = FindNormal(lon, lat);
+            } else {
+                normal = point {0., 1., 0.};
+            }
             
-            // next vertex over one in x
+            glNormal3f(normal.x, normal.y, normal.z);
             
-            glTexCoord2f(
-                         (float)( (x+1) % texIncLat ) / texIncLat,
-                         (float)( z % texIncLong ) / texIncLong
-                         );
+
             
-            glNormal3f(0., 1., 0.);
+            glVertex3f(LandscapePoints[lon][lat].x,
+                       LandscapePoints[lon][lat].y,
+                       LandscapePoints[lon][lat].z);
+ */
             
-            glVertex3f(LandscapePoints[x+1][z].x,
-                       LandscapePoints[x+1][z].y,
-                       LandscapePoints[x+1][z].z);
+            LandscapeVertex(lon, lat, texTileWidth);
+            
+            // next vertex, over one in x
+            /*
+            s = (float)((int)LandscapePoints[lon+1][lat].x % texTileWidth) / texTileWidth;
+            t = (float)((int)LandscapePoints[lon+1][lat].z % texTileWidth) / texTileWidth;
+            
+            glTexCoord2f(s, t);
+            
+            if(UseNormals) {
+                normal = FindNormal(lon + 1, lat);
+            } else {
+                normal = point {0., 1., 0.};
+
+            }
+            
+            glNormal3f(normal.x, normal.y, normal.z);
+            
+            glVertex3f(LandscapePoints[lon+1][lat].x,
+                       LandscapePoints[lon+1][lat].y,
+                       LandscapePoints[lon+1][lat].z);
+             
+            */
+            
+            LandscapeVertex(lon + 1, lat, texTileWidth);
+            
         }
         
         glEnd();
 
         }
     glEndList();
+}
+
+
+
+
+void
+DrawLandscape( ) {
+    
+    // make texTileWidth the width of a texture tile
+    
+    int texTileWidth;
+    if(NumElevLat > NumElevLong) {
+        texTileWidth = (int)(
+                             (float)(NumElevLat * LANDSCAPE_RES) / (float)TEX_TILES);
+    }
+    else {
+        texTileWidth = (int)(
+                             (float)(NumElevLong * LANDSCAPE_RES) / (float)TEX_TILES);
+    }
+    
+    //LandscapePoints[lon][lat]
+    //                 x    z
+
+    for(int lon = 1; lon < NumElevLong * LANDSCAPE_RES - 2; lon++) {
+        
+        glBegin(GL_TRIANGLE_STRIP);
+        
+        for(int lat = NumElevLat * LANDSCAPE_RES - 2; lat > 0; lat--) {
+            
+            // one vertex
+            
+            if(LandscapePoints[lon][lat].y < MIN_SNOW_LEVEL) {
+                glBindTexture(GL_TEXTURE_2D, GroundTexture);
+            }
+            else {
+                glBindTexture(GL_TEXTURE_2D, SnowTexture);
+            }
+            
+            float s = (float)((int)LandscapePoints[lon][lat].x % texTileWidth) / texTileWidth;
+            float t = (float)((int)LandscapePoints[lon][lat].z % texTileWidth) / texTileWidth;
+            glTexCoord2f(s, t);
+            
+            point normal;
+            if(UseNormals) {
+                normal = FindNormal(lon, lat);
+            } else {
+                normal = point {0., 1., 0.};
+            }
+            
+            glNormal3f(normal.x, normal.y, normal.z);
+            
+            
+            
+            glVertex3f(LandscapePoints[lon][lat].x,
+                       LandscapePoints[lon][lat].y,
+                       LandscapePoints[lon][lat].z);
+            
+            
+            // next vertex, over one in x
+            
+            if(LandscapePoints[lon + 1][lat].y < MIN_SNOW_LEVEL) {
+                glBindTexture(GL_TEXTURE_2D, GroundTexture);
+            }
+            else {
+                glBindTexture(GL_TEXTURE_2D, SnowTexture);
+            }
+            
+            
+            s = (float)((int)LandscapePoints[lon+1][lat].x % texTileWidth) / texTileWidth;
+            t = (float)((int)LandscapePoints[lon+1][lat].z % texTileWidth) / texTileWidth;
+            
+            glTexCoord2f(s, t);
+            
+            if(UseNormals) {
+                normal = FindNormal(lon + 1, lat);
+            } else {
+                normal = point {0., 1., 0.};
+                
+            }
+            
+            glNormal3f(normal.x, normal.y, normal.z);
+            
+            glVertex3f(LandscapePoints[lon+1][lat].x,
+                       LandscapePoints[lon+1][lat].y,
+                       LandscapePoints[lon+1][lat].z);
+        }
+        
+        glEnd();
+        
+    }
 }
 
 
@@ -1007,8 +1156,8 @@ SetupTexture( char* path )
     
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
     glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
     
     int level = 0,
@@ -1084,6 +1233,20 @@ Cross( float v1[3], float v2[3], float vout[3] )
     vout[1] = tmp[1];
     vout[2] = tmp[2];
 }
+
+
+
+
+point FindCross(point p1, point p2) {
+    float v1[] = {p1.x, p1.y, p1.z};
+    float v2[] = {p2.x, p2.y, p2.z};
+    float res[3];
+    
+    Cross(v1, v2, res);
+    
+    return point {res[0], res[1], res[2]};
+}
+
 
 
 
@@ -1322,7 +1485,6 @@ MouseMotion( int x, int y )
     Xmouse = x;			// new current position
     Ymouse = y;
     
-    printf("\tXmouse = %d, Ymouse = %d\n", x, y);
 
     
     glutSetWindow( MainWindow );
