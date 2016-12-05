@@ -54,13 +54,12 @@ const char PATH_XTR[] = "meyn1024.xtr";
 
 const char MODELPATH_HELI[] = "heliBody_mesh.obj";
 const char MODELPATH_BLADES[] = "heliBlades_mesh.obj";
-const char MODELPATH_TREE[] = "pine4.obj";
+const char MODELPATH_TREE[] = "pine.obj";
 
 char TEXPATH_HELI[] = "heli_d.bmp";
 char TEXPATH_SNOW[] = "snow3_d.bmp";
 char TEXPATH_GROUND[] = "dirt_d.bmp";
-
-char TEXPATH_TREE[] = "pine_d.bmp";
+char TEXPATH_TREE[] = "myLeaves.bmp";
 
 
 
@@ -82,8 +81,8 @@ const int     HELI_LAG_FRAMES = 20;
 
 const float   HELI_CLIMB_FAC = 0.05;
 const float   HELI_CLIMB_MAX = 100.;
-const float   HELI_TURN_FAC = 0.002;
-const float   HELI_TURN_MAX = 1000.;
+const float   HELI_TURN_FAC = 0.025;
+const float   HELI_TURN_MAX = 125.;
 
 const float   TILT_X_FAC = 5.;
 const float   TILT_Y_FAC = 5.;
@@ -92,26 +91,21 @@ const float   TILT_Z_AUTO_MAX = 10.;
 
 // landscape parameters
 
-const int LANDSCAPE_RES = 1;
-
-const int TEX_TILE_FAC = 8;
+const int LANDSCAPE_RES = 2;
 
 const int TEX_TILES = 2;
 
 const float ELEV_BASE = -1500.;
-const float LANDSCAPE_XZSCALE = 15.;
 
 const float LANDSCAPE_XSCALE = 10.56;
 const float LANDSCAPE_ZSCALE = 15.;
-
-
 const float LANDSCAPE_YSCALE = 0.4;
 
-const float TREE_SCALE = 0.25;
+const float TREE_SCALE = 1.;
 
 const float MIN_SNOW_LEVEL = 10.;
 
-bool UseNormals = false;
+bool UseNormals = true;
 
 
 // landscape "clutter"
@@ -122,31 +116,60 @@ const float TREE_ELEV_MAX = 500.;
 
 // global light parameters
 
-float   AmbR = 0., AmbG = 0., AmbB = 0.;
+float   AmbR = 0.3, AmbG = 0.3, AmbB = 0.3;
 
 // Light 0 parameters
 
 float   L0x = 0.,
         L0y = 5000.,
-        L0z = 50.;
+        L0z = 500000.;
 
-float   L0r = 0.7,
-        L0g = 0.7,
-        L0b = 0.8;
+float   L0r = 0.425,
+        L0g = 0.475,
+        L0b = 0.475;
 
 
 // Light 1 parameters
 
 float   L1x = 0.,
         L1y = 5000.,
-        L1z = -50.;
+        L1z = -500000.;
 
-float   L1r = 0.7,
-        L1g = 0.7,
-        L1b = 0.8;
-
-
+float   L1r = 0.375,
+        L1g = 0.425,
+        L1b = 0.45;
 
 
+// Light 2 parameters
+
+float   L2x = 500000.,
+        L2y = 5000.,
+        L2z = 0.;
+
+float   L2r = 0.4,
+        L2g = 0.4,
+        L2b = 0.4;
+
+
+// Light 3 parameters
+
+float   L3x = -500000.,
+        L3y = 5000.,
+        L3z = 0.;
+
+float   L3r = 0.375,
+        L3g = 0.375,
+        L3b = 0.35;
+
+
+// Light 4 parameters
+
+float   L4x = 0.,
+        L4y = 5000.,
+        L4z = 0.;
+
+float   L4r = 0.35,
+        L4g = 0.35,
+        L4b = 0.35;
 
 #endif
