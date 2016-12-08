@@ -77,6 +77,7 @@ GLuint  HeliTexture;            // the helicopter's texture handle
 GLuint  GroundTexture;          // ground texture handle
 GLuint  SnowTexture;
 GLuint  TreeTexture;
+GLuint  IceTexture;
 
 
 // landscape stuff
@@ -99,6 +100,7 @@ GLuint  HelicopterList;
 GLuint  BladeList;              // helicopter blade list
 GLuint  AxesList;
 GLuint  TreeList;
+GLuint  PancakeList;
 
 MouseAction WhichMouseAction = ROTATE;
 
@@ -202,6 +204,29 @@ Animate( )
 }
 
 
+
+void
+MakePancakeList() {
+    
+    PancakeList = glGenLists(1);
+    glNewList(PancakeList, GL_COMPILE);
+    
+    glBegin(GL_TRIANGLE_FAN);
+    glNormal3f(0., 1., 0.);
+    glTexCoord2f(0., 0.);
+    glVertex3f(0., WATER_LEVEL - 100., 0.);
+    for(int i = 0; i <= 500; i++) {
+        float ang = 360.f * (float)i / 500.f;
+        glNormal3f(0., 1., 0.);
+        glTexCoord2f(100.f * cosf(ang), 100.f * sinf(ang));
+        glVertex3f(100000.f * cosf(ang), WATER_LEVEL - 100., 100000.f * sinf(ang));
+    }
+    glEnd();
+    glEndList();
+}
+
+
+
 // draw the complete scene:
 
 void
@@ -297,6 +322,7 @@ Display( )
         glDisable( GL_FOG );
     }
     
+    
     // possibly draw the axes:
     
     if( AxesOn != 0 )
@@ -323,30 +349,55 @@ Display( )
         glutSolidSphere(100., 10., 10.);
     glPopMatrix();
 
+    
+    
     // draw "water"
     
-    glBegin(GL_QUADS);
-    glColor3f(0., 0.5, 0.75);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_TEXTURE_2D);
     
+    SetMaterial( 7., 8., 1., 2. );
+    glShadeModel(GL_SMOOTH);
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, IceTexture);
+    
+    glBegin(GL_QUADS);
+    glTexCoord2f(0., 0.);
     glVertex3f(LandscapePoints[0][0].x, WATER_LEVEL, LandscapePoints[0][0].z);
+    glTexCoord2f(0., 10.);
     glVertex3f(LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][0].x,
                WATER_LEVEL,
                LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][0].z);
+    glTexCoord2f(10., 10.);
     glVertex3f(LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][NumElevLat*LANDSCAPE_RES - 1].x,
                WATER_LEVEL,
                LandscapePoints[NumElevLong*LANDSCAPE_RES - 1][NumElevLat*LANDSCAPE_RES - 1].z);
+    glTexCoord2f(10., 0.);
     glVertex3f(LandscapePoints[0][NumElevLat*LANDSCAPE_RES - 1].x,
                WATER_LEVEL,
                LandscapePoints[0][NumElevLat*LANDSCAPE_RES - 1].z);
     glEnd();
     
-    // draw the landscape
-    
-    glEnable(GL_LIGHTING);
+    glDisable(GL_LIGHTING);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, SnowTexture);
     SetMaterial(1., .9, 1., 0.);
+    glColor3f(0.9, 0.925, 1.);
+    glCallList(PancakeList);
+    
+    
+    glColor3f(L0r, L0g, L0b);
+    glEnable(GL_LIGHTING);
+    
+    // draw the landscape
+    
+    glBindTexture(GL_TEXTURE_2D, SnowTexture);
+    SetMaterial(1., .9, 1., 0.);
     glCallList(LandscapeList);
+    
+    
+
+
     
     // draw the helicopter
     
@@ -447,8 +498,15 @@ UpdateHelicopterPosition() {
         InputY = -HELI_CLIMB_MAX;
     }
     
+    float dRad = HELI_TURN_FAC * (float)InputX;
+    
+    if(HeliAnimRadius - HeliAnimRadiusMin < HeliAnimRadiusMin && dRad < 0.) {
+        dRad *= ((HeliAnimRadius - HeliAnimRadiusMin) / HeliAnimRadiusMin);
+    }
+    
     HeliAltitude += HELI_CLIMB_FAC * (float)InputY;
-    HeliAnimRadius += HELI_TURN_FAC * (float)InputX;
+    //HeliAnimRadius += HELI_TURN_FAC * (float)InputX;
+    HeliAnimRadius += dRad;
     
     if(HeliAnimRadius < HeliAnimRadiusMin) {
         HeliAnimRadius = HeliAnimRadiusMin;
@@ -535,7 +593,19 @@ DrawHelicopter( ) {
         
         float prevR = sqrtf(prevPos.x * prevPos.x + prevPos.z * prevPos.z);
         float dr = HeliAnimRadius - prevR;
-        glRotatef(TILT_Y_FAC * -dr / HELI_LAG_FRAMES, 0., 1., 0.);
+        
+        float addTiltYFac = (HeliAnimRadiusMax - HeliAnimRadius) /
+                            (HeliAnimRadiusMax - HeliAnimRadiusMin);
+        addTiltYFac *= addTiltYFac;
+        
+        if(dr < 0.) {
+            addTiltYFac *= 3.;
+        }
+        else {
+            addTiltYFac *= 2.;
+        }
+        
+        glRotatef(addTiltYFac * TILT_Y_FAC * -dr / HELI_LAG_FRAMES, 0., 1., 0.);
         glRotatef(TILT_Z_FAC * -dr / HELI_LAG_FRAMES, 0., 0., 1.);
     
     }
@@ -674,6 +744,13 @@ InitGraphics( )
         exit(1);
     }
     
+    IceTexture = SetupTexture(TEXPATH_ICE);
+    if(!IceTexture) {
+        fprintf(stderr, "Couldn't load ice texture\n");
+        exit(1);
+    }
+
+    
     
     ChooseTreePoints();
     
@@ -721,6 +798,8 @@ InitLists( )
     MakeLandscapeList();
     
     InitListsFromMesh();
+    
+    MakePancakeList();
     
     // create the axes:
     
@@ -887,8 +966,8 @@ ConstructLandscape( ) {
             for(int latSubd = 0; latSubd < LANDSCAPE_RES; latSubd++) {
                 for(int lonSubd = 0; lonSubd < LANDSCAPE_RES; lonSubd++) {
                     
-                    int latIdx = LANDSCAPE_RES * lat + latSubd;
-                    int lonIdx = LANDSCAPE_RES * lon + lonSubd;
+                    int z = LANDSCAPE_RES * lat + latSubd;
+                    int x = LANDSCAPE_RES * lon + lonSubd;
                     
                     // get average height
                     
@@ -903,7 +982,7 @@ ConstructLandscape( ) {
                         }
                     }
                     
-                    LandscapePoints[lonIdx][latIdx] = point {
+                    LandscapePoints[x][z] = point {
                         LandscapeGrid[lon][lat].x + (float)lonSubd / (float)LANDSCAPE_RES,
                         //LandscapeGrid[lon][lat].y * LANDSCAPE_YSCALE,
                         height * LANDSCAPE_YSCALE,
@@ -911,41 +990,10 @@ ConstructLandscape( ) {
                         1., 1., 1.
                     };
                     
-                    
-                    /*
-                    LandscapeVertexNormals[lonIdx][latIdx] = LandscapeNormals[lon][lat];
-                    
-                    // average the normals of in-between points
-                    
-
-                    if(lon < NumElevLong - 1 && lat < NumElevLat - 1) {
-                        if(lonSubd > 0 && lonSubd < LANDSCAPE_RES) {
-                            LandscapeVertexNormals[lonIdx][latIdx].x =
-                                (LandscapeNormals[lon][lat].x +
-                                 LandscapeNormals[lon + 1][lat].x +
-                                 LandscapeNormals[lon][lat + 1].x +
-                                 LandscapeNormals[lon + 1][lat + 1].x) / 4.f;
-                            
-                            LandscapeVertexNormals[lonIdx][latIdx].y =
-                                (LandscapeNormals[lon][lat].y +
-                                 LandscapeNormals[lon + 1][lat].y +
-                                 LandscapeNormals[lon][lat + 1].y +
-                                 LandscapeNormals[lon + 1][lat + 1].y) / 4.f;
-                            
-                            LandscapeVertexNormals[lonIdx][latIdx].z =
-                                (LandscapeNormals[lon][lat].z +
-                                 LandscapeNormals[lon + 1][lat].z +
-                                 LandscapeNormals[lon][lat + 1].z +
-                                 LandscapeNormals[lon + 1][lat + 1].z) / 4.f;
-                        }
-                    }
-                     */
-                    
-                    
                     // scale the point in xz
                     
-                    LandscapePoints[lonIdx][latIdx].x *= LANDSCAPE_XSCALE;
-                    LandscapePoints[lonIdx][latIdx].z *= LANDSCAPE_ZSCALE;
+                    LandscapePoints[x][z].x *= LANDSCAPE_XSCALE;
+                    LandscapePoints[x][z].z *= LANDSCAPE_ZSCALE;
 
                 }
             }
@@ -975,8 +1023,8 @@ FindNormal(point** grid, int lon, int lat) {
 void
 LandscapeVertex(int lon, int lat, int texTileWidth) {
     
-    float s = (float)((int)fabs(LandscapePoints[lon][lat].x) % texTileWidth) / texTileWidth;
-    float t = (float)((int)fabs(LandscapePoints[lon][lat].z) % texTileWidth) / texTileWidth;
+    float s = (float)((int)(LandscapePoints[lon][lat].x) % texTileWidth) / texTileWidth;
+    float t = (float)((int)(LandscapePoints[lon][lat].z) % texTileWidth) / texTileWidth;
     
     glTexCoord2f(s, t);
     
@@ -988,8 +1036,6 @@ LandscapeVertex(int lon, int lat, int texTileWidth) {
     }
     
     glNormal3f(normal.x, normal.y, normal.z);
-    
-    
     
     glVertex3f(LandscapePoints[lon][lat].x,
                LandscapePoints[lon][lat].y,
@@ -1013,12 +1059,16 @@ MakeLandscapeList( ) {
     int texTileWidth;
         if(NumElevLat > NumElevLong) {
             texTileWidth = (int)(
-                                 (float)(NumElevLat * LANDSCAPE_RES) / (float)TEX_TILES);
+                    (LandscapePoints[0][NumElevLat * LANDSCAPE_RES - 1].z -
+                     LandscapePoints[0][0].z) / (float)TEX_TILES);
         }
         else {
             texTileWidth = (int)(
-                                 (float)(NumElevLong * LANDSCAPE_RES) / (float)TEX_TILES);
+                                 (LandscapePoints[NumElevLong * LANDSCAPE_RES - 1][0].x -
+                                  LandscapePoints[0][0].x) / (float)TEX_TILES);
         }
+    
+    printf("texTileWidth: %d\n", texTileWidth);
     
     //LandscapePoints[lon][lat]
     //                 x    z
@@ -1036,11 +1086,8 @@ MakeLandscapeList( ) {
             LandscapeVertex(lon + 1, lat, texTileWidth);
             
         }
-        
         glEnd();
-
     }
-    
     glEndList();
 }
 
@@ -1067,15 +1114,25 @@ void ChooseTreePoints() {
     
     for(int i = 0; i < NUM_TREES;) {
         
-        int x = rand() % NumElevLong * LANDSCAPE_RES;
-        int z = rand() % NumElevLat * LANDSCAPE_RES;
+        int x = rand() % (NumElevLong * LANDSCAPE_RES - 4) + 2;
+        int z = rand() % (NumElevLat * LANDSCAPE_RES - 4) + 2;
         
         if(OccupiedLocations[x][z] == false) {
             
-            // check whether this location is too high
+            // check whether this location is too high or low
             
-            if(LandscapePoints[x][z].y > TREE_ELEV_MAX) {
+            if(LandscapePoints[x][z].y > TREE_ELEV_MAX ||
+               LandscapePoints[x][z].y < TREE_ELEV_MIN) {
                 continue;
+            }
+            
+            if(LandscapePoints[x + 1][z].y - LandscapePoints[x][z].y > TREE_DELTA_ELEV_MAX ||
+               LandscapePoints[x - 1][z].y - LandscapePoints[x][z].y > TREE_DELTA_ELEV_MAX ||
+               LandscapePoints[x][z + 1].y - LandscapePoints[x][z].y > TREE_DELTA_ELEV_MAX ||
+               LandscapePoints[x][z - 1].y - LandscapePoints[x][z].y > TREE_DELTA_ELEV_MAX) {
+                
+                continue;
+            
             }
             
             OccupiedLocations[x][z] = true;
@@ -1262,6 +1319,10 @@ Keyboard( unsigned char c, int x, int y )
         case 'c':
         case 'C':
             LookFollows = !LookFollows;
+            Scale = 1.;
+            FollowScale = DEFAULT_FOLLOW_SCALE;
+            Xrot = 0.;
+            Yrot = 0.;
             break;
             
         case 'e':

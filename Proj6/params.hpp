@@ -50,16 +50,17 @@ const GLfloat AXES_WIDTH   = { 3. };
 
 // file paths
 
-const char PATH_XTR[] = "meyn1024.xtr";
+const char PATH_XTR[] = "meyn1200.xtr";
 
 const char MODELPATH_HELI[] = "heliBody_mesh.obj";
 const char MODELPATH_BLADES[] = "heliBlades_mesh.obj";
-const char MODELPATH_TREE[] = "pine.obj";
+const char MODELPATH_TREE[] = "pine_mesh.obj";
 
 char TEXPATH_HELI[] = "heli_d.bmp";
 char TEXPATH_SNOW[] = "snow3_d.bmp";
+char TEXPATH_ICE[] = "ice_d.bmp";
 char TEXPATH_GROUND[] = "dirt_d.bmp";
-char TEXPATH_TREE[] = "myLeaves.bmp";
+char TEXPATH_TREE[] = "pine_d.bmp";
 
 
 
@@ -72,30 +73,33 @@ int     HeliAnimInitRevs = 10;
 int     HeliAnimRevs = 10;
 int     HeliBladeRevsFac = 800;
 float   HeliAnimRadius = 2500.f;
-float   HeliAnimRadiusMin = 1000.f;
-float   HeliAnimRadiusMax = 3000.f;
+float   HeliAnimRadiusMin = 300.f;
+float   HeliAnimRadiusMax = 4000.f;
 
 const float   CAM_FOLLOW_DIST = 15.f;
 const float   DEFAULT_FOLLOW_SCALE = 1.;
 const int     HELI_LAG_FRAMES = 20;
 
-const float   HELI_CLIMB_FAC = 0.05;
+//const float   HELI_CLIMB_FAC = 0.05;
+const float   HELI_CLIMB_FAC = 0.015;
 const float   HELI_CLIMB_MAX = 100.;
 const float   HELI_TURN_FAC = 0.025;
 const float   HELI_TURN_MAX = 125.;
 
 const float   TILT_X_FAC = 5.;
-const float   TILT_Y_FAC = 5.;
-const float   TILT_Z_FAC = 3.5;
-const float   TILT_Z_AUTO_MAX = 10.;
+//const float   TILT_Y_FAC = 7.;
+//const float   TILT_Z_FAC = 3.5;
+const float   TILT_Y_FAC = 10.;
+const float   TILT_Z_FAC = 2.;
+const float   TILT_Z_AUTO_MAX = 20.;
 
 // landscape parameters
 
-const float WATER_LEVEL = -375.;
+const float WATER_LEVEL = -575.;
 
 const int LANDSCAPE_RES = 1;
 
-const int TEX_TILES = 2;
+const int TEX_TILES = 32;
 
 const float ELEV_BASE = -1500.;
 
@@ -105,15 +109,18 @@ const float LANDSCAPE_YSCALE = 0.4;
 
 const float TREE_SCALE = 1.;
 
-const float MIN_SNOW_LEVEL = 10.;
+const float MIN_SNOW_LEVEL = 400.;
 
 bool UseNormals = true;
 
 
 // landscape "clutter"
 
-const int NUM_TREES = 1000;
+const int NUM_TREES = 3000;
 const float TREE_ELEV_MAX = 500.;
+const float TREE_ELEV_MIN = -500.;
+
+const float TREE_DELTA_ELEV_MAX = 1.;
 
 
 // global light parameters
